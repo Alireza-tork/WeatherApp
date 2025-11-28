@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>اپ هواشناسی ساده</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#60a5fa;
+      --glass: rgba(255,255,255,0.04);
+      --text:#e6eef8;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:linear-gradient(180deg,#071022 0%, #0f1724 60%);
+      color:var(--text);
+      font-family:Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .app{
+      width:100%;
+      max-width:920px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:18px;
+      padding:20px;
+      box-shadow:0 10px 30px rgba(2,6,23,0.6);
+      backdrop-filter: blur(6px);
+    }
+    header{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:12px;
+    }
+    header h1{
+        font-size:20px;
+        margin:0;
+    }
+    .controls{
+        display:flex;
+        gap:8px;
+        align-items:center;
+        margin-bottom:16px;
+    }
+    .search{
+        flex:1;
+        display:flex;
+        gap:8px;
+    }
+    input[type=text]{
+        flex:1;
+        padding:10px 12px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,0.06);
+        background:transparent;
+        color:var(--text);
+        outline:none;
+        font-size:15px;
+    }
+    button{
+        padding:10px 12px;
+        border-radius:10px;
+        border:0;
+        background:linear-gradient(90deg,var(--accent), #3b82f6);
+        color:#021024;
+        font-weight:600;
+        cursor:pointer;
+    }
+    button.secondary{
+        background:transparent;
+        border:1px solid rgba(255,255,255,0.06);
+        color:var(--text);
+        font-weight:600;
+    }
+    .grid{
+        display:grid;
+        grid-template-columns:1fr 320px;
+        gap:18px;
+    }
+    @media (max-width:880px){.grid{grid-template-columns:1fr} .controls{flex-direction:column} header{flex-direction:column;align-items:flex-start}}
+
+    .main-card{
+        background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        padding:18px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,0.03);
+    }
+    .current{
+        display:flex;
+        align-items:center;
+        gap:18px;
+    }
+    .icon{
+        width:110px;
+        height:110px;
+        border-radius:12px;
+        background:var(--glass);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:42px;
+    }
+    .temp{
+        font-size:46px;
+        font-weight:700;
+    }
+    .meta{opacity:0.9}
+
+    .side{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+    }
+    .card{
+        background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+        padding:12px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,0.03);
+    }
+    .row{
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+    }
+    .small{
+        font-size:13px;
+        opacity:0.9;
+    }
+    .footer{
+        margin-top:12px;
+        font-size:13px;
+        opacity:0.7;
+    }
+
+    .loading{
+        opacity:0.8;
+        font-size:14px;
+    }
+    .error{
+        color:#ff7a7a;
+        font-weight:700;
+    }
+
+    /* simple animations */
+    .pulse{animation:pulse 2s infinite}
+    @keyframes pulse{0%{transform:translateY(0)}50%{transform:translateY(-3px)}100%{transform:translateY(0)}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>اپ هواشناسی </h1>
+      <div style="margin-inline-start:auto;color:rgba(255,255,255,0.6);font-size:13px">بدون نیاز به کلید API — از Open-Meteo و Geocoding رایگان استفاده می‌کند</div>
+    </header>
+
+    <div class="controls">
+      <div class="search">
+        <input id="q" type="text" placeholder="نام شهر را بنویسید، مثلا: Tehran یا London" />
+        <button id="searchBtn">جستجو</button>
+      </div>
+      <button id="locBtn" class="secondary">استفاده از لوکیشن من</button>
+      <button id="refreshBtn" class="secondary">به‌روزرسانی</button>
+    </div>
+
+    <div class="grid">
+      <div class="main-card">
+        <div id="status" class="loading">آماده. شهری را جستجو کنید یا از لوکیشن استفاده کنید.</div>
+
+        <div id="weatherUI" style="display:none;margin-top:12px">
+          <div class="current">
+            <div class="icon" id="icon">☀️</div>
+            <div>
+              <div class="temp" id="temp">-- °C</div>
+              <div class="meta" id="desc">--</div>
+              <div class="small" id="place">--</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px" class="row small">
+            <div>سرعت باد: <span id="wind">-- m/s</span></div>
+            <div>فشار: <span id="pressure">-- hPa</span></div>
+            <div>جهت: <span id="windDir">--</span></div>
+          </div>
+
+          <div style="margin-top:12px" class="row">
+            <div class="small">زمان آخرین داده: <span id="time">--</span></div>
+            <div class="small">منبع: Open-Meteo</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700">اطلاعات بیشتر</div>
+            <div class="small" id="coords">--</div>
+          </div>
+          <div style="margin-top:8px" class="small">پیش‌بینی ساعتی و توضیحات کد آب و هوا نمایش داده می‌شود.</div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:6px">راهنما</div>
+          <ul style="margin:0;padding-inline-start:18px;line-height:1.6;font-size:13px">
+            <li>شهر را بنویسید و دکمه «جستجو» را بزنید.</li>
+            <li>یا «استفاده از لوکیشن من» را بزنید تا مرورگر موقعیت شما را دریافت کند.</li>
+            <li>برنامه از Open-Meteo برای دریافت آب و هوا استفاده می‌کند — نیازی به کلید API نیست*.</li>
+          </ul>
+        </div>
+
+        <div class="card" id="debugCard" style="display:none">
+          <div style="font-weight:700">دیباگ</div>
+          <pre id="debug" style="white-space:pre-wrap;font-size:12px;opacity:0.85"></pre>
+        </div>
+      </div>
+    </div>
+
+  <script>
+    // Helper: map Open-Meteo weathercode to emoji and description (فارسی)
+    const weatherMap = {
+      0: {icon:'☀️', text:'صاف'},
+      1: {icon:'🌤️', text:'کمی ابری'},
+      2: {icon:'⛅', text:'ابری پراکنده'},
+      3: {icon:'☁️', text:'ابری'},
+      45: {icon:'🌫️', text:'مه'},
+      48: {icon:'🌫️', text:'مه یخ‌زده'},
+      51: {icon:'🌦️', text:'باران ریز'},
+      53: {icon:'🌦️', text:'باران ریز متوسط'},
+      55: {icon:'🌧️', text:'باران ریز شدید'},
+      56: {icon:'🌧️', text:'باران یخ‌زده ریز'},
+      57: {icon:'🌧️', text:'باران یخ‌زده شدید'},
+      61: {icon:'🌧️', text:'بارش باران'},
+      63: {icon:'🌧️', text:'بارش باران متوسط'},
+      65: {icon:'⛈️', text:'بارش باران شدید'},
+      71: {icon:'🌨️', text:'بارش برف'},
+      73: {icon:'🌨️', text:'بارش برف متوسط'},
+      75: {icon:'🌨️', text:'بارش برف شدید'},
+      80: {icon:'🌦️', text:'بارش نامنظم'},
+      81: {icon:'🌧️', text:'بارش نامنظم'},
+      82: {icon:'⛈️', text:'بارش ناپایدار'},
+      95: {icon:'⛈️', text:'رعد و برق'},
+      96: {icon:'⛈️', text:'رعد و برق با تگرگ خفیف'},
+      99: {icon:'⛈️', text:'رعد و برق با تگرگ'}
+    };
+    console.log(weatherMap);
+    
+    const qInput = document.getElementById('q');
+    const searchBtn = document.getElementById('searchBtn');
+    const locBtn = document.getElementById('locBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const status = document.getElementById('status');
+    const weatherUI = document.getElementById('weatherUI');
+
+    const iconEl = document.getElementById('icon');
+    const tempEl = document.getElementById('temp');
+    const descEl = document.getElementById('desc');
+    const placeEl = document.getElementById('place');
+    const coordsEl = document.getElementById('coords');
+    const windEl = document.getElementById('wind');
+    const pressureEl = document.getElementById('pressure');
+    const windDirEl = document.getElementById('windDir');
+    const timeEl = document.getElementById('time');
+    const debugCard = document.getElementById('debugCard');
+    const debugPre = document.getElementById('debug');
+
+    let lastPosition = null; 
+    let lastResponse = null;
+
+    function setStatus(s, err=false){
+      status.textContent = s;
+      status.className = err? 'error' : 'loading';
+    }
+
+    function mapWeather(code){
+      return weatherMap[code] || {icon:'❓', text:'نامشخص'};
+    }
+
+    function degToCompass(num){
+      const val = Math.floor((num/22.5)+0.5);
+      const arr = ["شمال","شمال‌شرق","شرق","جنوب‌شرق","جنوب","جنوب‌غرب","غرب","شمال‌غرب"];
+      return arr[(val % 8)];
+    }
+
+    async function fetchWeather(lat, lon, name){
+      try{
+        setStatus('در حال واکشی داده‌های هوا...');
+        weatherUI.style.display='none';
+        coordsEl.textContent = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+
+        // Open-Meteo current weather
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relativehumidity_2m,pressure_msl,windspeed_10m,winddirection_10m&timezone=auto`;
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('خطا در دریافت از Open-Meteo');
+        const data = await res.json();
+        lastResponse = data;
+
+        if(!data.current_weather) throw new Error('دادهٔ Current Weather وجود ندارد');
+
+        const cw = data.current_weather;
+        const w = mapWeather(cw.weathercode);
+
+        iconEl.textContent = w.icon;
+        tempEl.textContent = `${cw.temperature.toFixed(1)} °C`;
+        descEl.textContent = `${w.text} — کد: ${cw.weathercode}`;
+        placeEl.textContent = name || `مختصات: ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+        windEl.textContent = `${cw.windspeed} m/s`;
+        windDirEl.textContent = `${degToCompass(cw.winddirection)} (${cw.winddirection}°)`;
+        pressureEl.textContent = data.hourly && data.hourly.pressure_msl && data.hourly.pressure_msl.length? `${data.hourly.pressure_msl[0]} hPa` : '—';
+        timeEl.textContent = cw.time;
+
+        weatherUI.style.display='block';
+        setStatus('به‌روز شد.');
+        debugCard.style.display='none';
+        lastPosition = {lat, lon, name};
+      }catch(err){
+        console.error(err);
+        setStatus('خطا: '+err.message, true);
+        debugCard.style.display='block';
+        debugPre.textContent = (err.stack || err.message || String(err));
+      }
+    }
+
+    async function geocodeAndFetch(query){
+      try{
+        if(!query) { setStatus('لطفا نام شهر را وارد کنید.', true); return; }
+        setStatus('در حال جستجوی شهر...');
+        const geourl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=fa`;
+        const gres = await fetch(geourl);
+        if(!gres.ok) throw new Error('خطا در دریافت اطلاعات مکان');
+        const gdata = await gres.json();
+        if(!gdata.results || gdata.results.length===0) { setStatus('مکانی پیدا نشد.', true); return; }
+        const top = gdata.results[0];
+        const pretty = `${top.name}${top.admin1?(', '+top.admin1):''}${top.country?(', '+top.country):''}`;
+        await fetchWeather(top.latitude, top.longitude, pretty);
+      }catch(err){
+        console.error(err);
+        setStatus('خطا در جستجو: '+err.message, true);
+      }
+    }
+
+    searchBtn.addEventListener('click', ()=> geocodeAndFetch(qInput.value.trim()));
+    qInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') geocodeAndFetch(qInput.value.trim()); });
+    refreshBtn.addEventListener('click', ()=>{
+      if(lastPosition) fetchWeather(lastPosition.lat, lastPosition.lon, lastPosition.name);
+      else setStatus('ابتدا شهری را جستجو یا از لوکیشن استفاده کنید.', true);
+    });
+
+    locBtn.addEventListener('click', ()=>{
+      if(!navigator.geolocation) { setStatus('مرورگر شما از Geolocation پشتیبانی نمی‌کند.', true); return; }
+      setStatus('در حال دریافت موقعیت...');
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        // try to reverse geocode name using Open-Meteo geocoding reverse (not necessary but helpful)
+        try{
+          const rev = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=fa`);
+          let name = '';
+          if(rev.ok){
+            const rj = await rev.json();
+            if(rj && rj.name) name = `${rj.name}${rj.admin1?(', '+rj.admin1):''}${rj.country?(', '+rj.country):''}`;
+          }
+          await fetchWeather(lat, lon, name||'موقعیت شما');
+        }catch(e){
+          await fetchWeather(lat, lon, 'موقعیت شما');
+        }
+      }, (err)=>{
+        setStatus('خطا در خواندن لوکیشن: '+err.message, true);
+      }, {enableHighAccuracy:true, timeout:10000});
+    });
+
+    // small UX: autosuggest using geocoding (lite)
+    let suggestTimeout = null;
+    qInput.addEventListener('input', ()=>{
+      if(suggestTimeout) clearTimeout(suggestTimeout);
+      suggestTimeout = setTimeout(async ()=>{
+        const v = qInput.value.trim(); if(!v) return;
+        try{
+          const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(v)}&count=5&language=fa`;
+          const r = await fetch(url);
+          if(!r.ok) return;
+          const j = await r.json();
+          // simple: if exact match returned first, do nothing; we won't render a dropdown to keep UI simple
+        }catch(e){ /* ignore */ }
+      }, 400);
+    });
+
+    // Optional: keyboard shortcut Ctrl+K to focus search
+    window.addEventListener('keydown', (e)=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); qInput.focus(); qInput.select(); } });
+
+  </script>
+</body>
+</html>
